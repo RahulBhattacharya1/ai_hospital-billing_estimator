@@ -7,6 +7,13 @@ import pandas as pd
 import streamlit as st
 from datetime import date, datetime
 
+# Fallback list if artifacts don't provide feature_cols_raw
+DEFAULT_RAW_FEATURES = [
+    "Age","Gender","Blood Type","Medical Condition",
+    "Hospital","Insurance Provider","Admission Type",
+    "Medication","Test Results","length_of_stay"
+]
+
 st.set_page_config(page_title="Hospital Billing Amount Estimator", layout="wide")
 st.title("Hospital Billing Amount Estimator")
 
