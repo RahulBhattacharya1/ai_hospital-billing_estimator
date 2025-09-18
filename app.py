@@ -13,33 +13,44 @@ st.title("Hospital Billing Amount Estimator")
 # ------------------------------------------------------------
 # Load model artifacts
 # ------------------------------------------------------------
+# ---- Load artifacts (defensive) ----
 @st.cache_resource
 def load_artifacts():
-    """
-    Expects:
-      models/billing_model.joblib
-      models/feature_columns.json
-    """
+    import os
+    missing = []
+    if not os.path.exists("models"):
+        missing.append("models/ (folder)")
+    if not os.path.exists("models/billing_model.joblib"):
+        missing.append("models/billing_model.joblib")
+    if not os.path.exists("models/feature_columns.json"):
+        missing.append("models/feature_columns.json")
+
+    if missing:
+        st.error("Missing required files:\n- " + "\n- ".join(missing))
+        st.stop()
+
     try:
         artifacts = joblib.load("models/billing_model.joblib")
-    except FileNotFoundError:
+    except Exception as e:
+        st.error(f"Failed to load model file 'models/billing_model.joblib'.\nError: {e!r}\n\n"
+                 "Tip: ensure scikit-learn version in requirements.txt matches the version used in Colab (1.4.2).")
         st.stop()
+
     try:
         with open("models/feature_columns.json", "r") as f:
             feature_columns = json.load(f)
-    except FileNotFoundError:
+    except Exception as e:
+        st.error(f"Failed to read 'models/feature_columns.json'.\nError: {e!r}")
         st.stop()
 
-    model = artifacts["model"]
+    model = artifacts.get("model", None)
+    if model is None:
+        st.error("Model object not found inside billing_model.joblib (key 'model').")
+        st.stop()
+
     raw_features = artifacts.get("feature_cols_raw", [])
     return model, feature_columns, raw_features
 
-model, FEATURE_COLUMNS, RAW_FEATURES = load_artifacts()
-
-st.markdown(
-    "Use the form below for a single estimate or upload a CSV in the sidebar for batch predictions. "
-    "The app aligns your inputs to the model’s one-hot schema automatically."
-)
 
 # ------------------------------------------------------------
 # Helpers
