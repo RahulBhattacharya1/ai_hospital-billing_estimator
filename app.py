@@ -113,21 +113,35 @@ def template_csv_bytes():
 # ------------------------------------------------------------
 st.sidebar.header("Batch Prediction")
 st.sidebar.caption("Upload a CSV. You can download a template first.")
+
 st.sidebar.download_button(
     label="Download CSV template",
     data=template_csv_bytes(),
     file_name="billing_batch_template.csv",
-    mime="text/csv"
+    mime="text/csv",
+    key="tpl_btn"
 )
 
-batch_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
+# Keep the uploaded file alive across reruns
+uploaded = st.sidebar.file_uploader("Upload CSV", type=["csv"], key="batch_csv")
 
-if st.sidebar.button("Predict Batch"):
-    if batch_file is None:
+if uploaded is not None:
+    # Cache the bytes in session_state so clicking buttons doesn't lose the file
+    st.session_state["batch_csv_bytes"] = uploaded.getvalue()
+    st.sidebar.success("CSV uploaded. Ready to predict.")
+else:
+    # Only clear cache if user explicitly removes the file
+    if "batch_csv_bytes" in st.session_state:
+        pass  # keep last file
+
+# A button that uses whatever is in session_state
+if st.sidebar.button("Predict Batch", key="predict_batch_btn"):
+    if "batch_csv_bytes" not in st.session_state:
         st.sidebar.error("Please upload a CSV file.")
     else:
+        import io
         try:
-            bdf = pd.read_csv(batch_file)
+            bdf = pd.read_csv(io.BytesIO(st.session_state["batch_csv_bytes"]))
         except Exception as e:
             st.sidebar.error(f"Could not read CSV: {e}")
             st.stop()
@@ -135,15 +149,17 @@ if st.sidebar.button("Predict Batch"):
         # Optional date parsing and LOS computation
         if {"Date of Admission", "Discharge Date"}.issubset(set(bdf.columns)):
             bdf["Date of Admission"] = pd.to_datetime(bdf["Date of Admission"], errors="coerce")
-            bdf["Discharge Date"] = pd.to_datetime(bdf["Discharge Date"], errors="coerce")
-            bdf["length_of_stay"] = (bdf["Discharge Date"] - bdf["Date of Admission"]).dt.days
-            bdf["length_of_stay"] = bdf["length_of_stay"].clip(lower=0).fillna(0)
+            bdf["Discharge Date"]   = pd.to_datetime(bdf["Discharge Date"], errors="coerce")
+            bdf["length_of_stay"]   = (bdf["Discharge Date"] - bdf["Date of Admission"]).dt.days
+            bdf["length_of_stay"]   = bdf["length_of_stay"].clip(lower=0).fillna(0)
 
-        # Build the raw feature frame using whatever of RAW_FEATURES are present
+        # Build raw feature frame using whatever of RAW_FEATURES are present
         use_cols = [c for c in RAW_FEATURES if c in bdf.columns]
-        if "Test Results" in use_cols:
+
+        # Numeric sanitation
+        if "Test Results" in bdf.columns:
             bdf["Test Results"] = to_numeric_safe(bdf["Test Results"])
-        if "Age" in use_cols:
+        if "Age" in bdf.columns:
             bdf["Age"] = pd.to_numeric(bdf["Age"], errors="coerce")
 
         if not use_cols:
@@ -159,7 +175,8 @@ if st.sidebar.button("Predict Batch"):
                 label="Download predictions",
                 data=out.to_csv(index=False),
                 file_name="billing_predictions.csv",
-                mime="text/csv"
+                mime="text/csv",
+                key="dl_preds_btn"
             )
 
 # ------------------------------------------------------------
