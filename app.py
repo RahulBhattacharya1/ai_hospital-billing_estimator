@@ -58,6 +58,10 @@ def load_artifacts():
     raw_features = artifacts.get("feature_cols_raw", [])
     return model, feature_columns, raw_features
 
+# ---- call the loader and ensure RAW_FEATURES exists ----
+model, FEATURE_COLUMNS, RAW_FEATURES = load_artifacts()
+if not RAW_FEATURES:
+    RAW_FEATURES = DEFAULT_RAW_FEATURES[:]  # fallback if older model lacks feature_cols_raw
 
 # ------------------------------------------------------------
 # Helpers
